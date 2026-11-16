@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>Coordinate Converter</title>
+    <link rel="preload" href="fonts/Archivo-variable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        /* Apply a saved theme before the page paints, so it does not flash. */
+        try {
+            var saved = localStorage.getItem("theme");
+            if (saved === "light" || saved === "dark") {
+                document.documentElement.setAttribute("data-theme", saved);
+            }
+        } catch (e) { /* storage blocked: follow the system theme */ }
+    </script>
+</head>
+<body>
+
+<header class="topbar">
+    <a class="brand" href="/" aria-label="Coordinate Converter, home">
+        <svg class="brand-mark" viewBox="0 0 40 16" width="40" height="16" aria-hidden="true">
+            <line x1="5" y1="8" x2="35" y2="8" stroke="currentColor" stroke-width="3"/>
+            <circle cx="5" cy="8" r="4.5" fill="var(--signal)" stroke="currentColor" stroke-width="2.5"/>
+            <rect x="29.5" y="2.5" width="11" height="11" rx="3" fill="currentColor"/>
+        </svg>
+        <span>Coordinate Converter</span>
+    </a>
+    <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark theme">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+            <path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>
+        </svg>
+    </button>
+</header>
+
+<main>
+    <section class="hero">
+        <h1>Turn a stop list into Go.csv</h1>
+        <p class="lede">Add your bus stops from an Excel file, or type them in. Every latitude and longitude
+            is converted, and you get Go.csv back, ready to use.</p>
+    </section>
+
+    <section class="route" aria-labelledby="route-title">
+        <h2 class="visually-hidden" id="route-title">Convert bus stops to Go.csv</h2>
+
+        <ol class="steps" id="steps">
+
+            <li class="step" id="step-file" data-state="active">
+                <span class="marker" aria-hidden="true"></span>
+                <div class="step-body">
+                    <h3>Add your stops</h3>
+
+                    <div class="tabs" role="tablist" aria-label="How to add your stops">
+                        <button type="button" role="tab" class="tab" id="tab-file"
+                                aria-selected="true" aria-controls="panel-file">Excel file</button>
+                        <button type="button" role="tab" class="tab" id="tab-manual"
+                                aria-selected="false" aria-controls="panel-manual" tabindex="-1">Type stops in</button>
+                    </div>
+
+                    <!-- Way 1: upload an Excel file -->
+                    <div role="tabpanel" id="panel-file" aria-labelledby="tab-file">
+                        <label class="dropzone" id="dropzone" for="excelFile">
+                            <input type="file" id="excelFile" class="visually-hidden" accept=".xlsx"
+                                   aria-describedby="fileHelp">
+                            <span class="dropzone-main" id="dropzoneMain">
+                                <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true">
+                                    <path d="M10 4h20l10 10v30H10z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+                                    <path d="M30 4v10h10" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+                                    <path d="M18 24l12 14M30 24L18 38" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                </svg>
+                                <span class="dropzone-text">
+                                    <strong id="dropTitle">Drop your .xlsx file here</strong>
+                                    <span id="dropSub">or <span class="link-like">browse your computer</span></span>
+                                </span>
+                            </span>
+                        </label>
+                        <p class="help" id="fileHelp">The sheet needs the columns <em>Station Name</em>,
+                            <em>Longitude</em> and <em>Latitude</em>. Up to 5&nbsp;MB.</p>
+                    </div>
+
+                    <!-- Way 2: type the stops in. The rows are added by js/app.js -->
+                    <div role="tabpanel" id="panel-manual" aria-labelledby="tab-manual" hidden>
+                        <div class="manual-head" aria-hidden="true">
+                            <span>Stop</span>
+                            <span>Station name</span>
+                            <span>Latitude</span>
+                            <span>Longitude</span>
+                            <span></span>
+                        </div>
+                        <ol class="manual-rows" id="manualRows" aria-describedby="manualHelp"></ol>
+                        <div class="manual-actions">
+                            <button type="button" class="btn-secondary" id="addRowBtn">Add a stop</button>
+                            <button type="button" class="btn-quiet" id="clearRowsBtn">Clear all stops</button>
+                        </div>
+                        <p class="help" id="manualHelp">List the stops in route order: the first is the start and
+                            the last is the end. Use decimal degrees, for example -25.984409 and 28.237797.
+                            Press Enter to move to the next box.</p>
+                    </div>
+                </div>
+            </li>
+
+            <li class="step" id="step-convert" data-state="upcoming">
+                <span class="marker" aria-hidden="true"></span>
+                <div class="step-body">
+                    <h3>Convert</h3>
+                    <div class="actions">
+                        <button type="button" class="btn-primary" id="convertBtn" disabled>
+                            Convert and download Go.csv
+                        </button>
+                        <span class="spinner" id="spinner" hidden aria-hidden="true"></span>
+                    </div>
+                    <p class="status" id="convertStatus" role="status"></p>
+                </div>
+            </li>
+
+            <li class="step" id="step-done" data-state="upcoming" data-terminus>
+                <span class="marker" aria-hidden="true"></span>
+                <div class="step-body">
+                    <h3>Go.csv is ready</h3>
+                    <p class="help" id="doneHint">Your stops appear here, drawn as a route, once the conversion finishes.</p>
+                    <div id="result" hidden>
+                        <p class="summary" id="summary"></p>
+                        <p class="result-actions">
+                            <a class="btn-secondary" id="downloadAgain" href="#" download="Go.csv">Download Go.csv again</a>
+                        </p>
+                        <h4 id="previewTitle">Stops in Go.csv</h4>
+                        <ul class="route-preview" id="preview" tabindex="0" aria-labelledby="previewTitle"></ul>
+                    </div>
+                </div>
+            </li>
+
+        </ol>
+    </section>
+
+    <section class="single" aria-labelledby="single-title">
+        <h2 id="single-title">Convert one coordinate</h2>
+        <p class="help">Uses the same rule as the Go.csv conversion. Nothing is saved.</p>
+
+        <form id="singleForm" novalidate>
+            <div class="field">
+                <label for="latitude">Latitude</label>
+                <input type="text" inputmode="decimal" id="latitude" autocomplete="off" placeholder="-25.984409">
+            </div>
+            <div class="field">
+                <label for="longitude">Longitude</label>
+                <input type="text" inputmode="decimal" id="longitude" autocomplete="off" placeholder="28.237797">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Convert</button>
+                <button type="button" class="btn-quiet" id="clearBtn">Clear</button>
+            </div>
+        </form>
+
+        <p class="status" id="singleStatus" role="status"></p>
+
+        <dl class="readouts" id="readouts" hidden>
+            <div class="readout">
+                <dt>Latitude</dt>
+                <dd>
+                    <span class="readout-value" id="outLat"></span>
+                    <span class="readout-detail" id="outLatDetail"></span>
+                </dd>
+            </div>
+            <div class="readout">
+                <dt>Longitude</dt>
+                <dd>
+                    <span class="readout-value" id="outLon"></span>
+                    <span class="readout-detail" id="outLonDetail"></span>
+                </dd>
+            </div>
+        </dl>
+    </section>
+</main>
+
+<footer class="footer">
+    <p>Nothing is saved. Your stops are converted and sent straight back to you.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
